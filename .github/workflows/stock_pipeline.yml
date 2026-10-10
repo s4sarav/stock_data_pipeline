@@ -1,8 +1,8 @@
 on:
   schedule:
-    # Runs automatically from Monday to Friday at 9:00 PM UTC (after US markets close)
+    # Runs Monday to Friday at 9:00 PM UTC (after US market closes)
     - cron: '0 21 * * 1-5'
-  workflow_dispatch: # Allows you to run it manually with one click
+  workflow_dispatch: # Allows you to trigger the pipeline manually via the GitHub UI
 
 jobs:
   run-pipeline:
@@ -16,19 +16,25 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+        cache: 'pip' # Speeds up future workflow runs by caching packages
 
-    - name: Install Dependencies
+    - name: Install Project Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install yfinance duckdb pandas
+        pip install yfinance duckdb pandas dbt-core dbt-duckdb
 
-    - name: Run Stock Pipeline Script
+    - name: 🚀 Step 1 - Run Python Extraction & Load
       run: python pipeline.py
 
-    - name: Commit and Push Database Changes
+    - name: 🚀 Step 2 - Run dbt Transformations
+      run: |
+        cd stock_transformations
+        dbt run --profiles-dir .
+
+    - name: 💾 Step 3 - Commit and Push Database Changes
       run: |
         git config --global user.name "GitHub Actions Bot"
         git config --global user.email "actions@github.com"
         git add stock_warehouse.db
-        git commit -m "data: automatic stock warehouse update" || echo "No changes to commit"
+        git commit -m "data: automatic stock warehouse and transform update" || echo "No data changes to commit"
         git push
